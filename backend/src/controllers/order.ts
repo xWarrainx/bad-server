@@ -29,6 +29,17 @@ export const getOrders = async (
             search,
         } = req.query
 
+        // Устанавливаем максимальный лимит в 10
+        const maxLimit = 10;
+        let queryLimit = Number(limit);
+
+        // Проверяем, что limit - число и не превышает максимум
+        if (isNaN(queryLimit) || queryLimit < 1) {
+            queryLimit = 10; // значение по умолчанию
+        } else if (queryLimit > maxLimit) {
+            queryLimit = maxLimit; // ограничиваем максимумом
+        }
+
         const filters: FilterQuery<Partial<IOrder>> = {}
 
         if (status) {
@@ -117,8 +128,8 @@ export const getOrders = async (
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (Number(page) - 1) * queryLimit },
+            { $limit: queryLimit },
             {
                 $group: {
                     _id: '$_id',
@@ -134,7 +145,7 @@ export const getOrders = async (
 
         const orders = await Order.aggregate(aggregatePipeline)
         const totalOrders = await Order.countDocuments(filters)
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / queryLimit)
 
         res.status(200).json({
             orders,
@@ -142,7 +153,7 @@ export const getOrders = async (
                 totalOrders,
                 totalPages,
                 currentPage: Number(page),
-                pageSize: Number(limit),
+                pageSize: queryLimit,
             },
         })
     } catch (error) {
@@ -158,9 +169,18 @@ export const getOrdersCurrentUser = async (
     try {
         const userId = res.locals.user._id
         const { search, page = 1, limit = 5 } = req.query
+        // Устанавливаем максимальный лимит для пользователя
+        const maxLimit = 10;
+        let queryLimit = Number(limit);
+
+        if (isNaN(queryLimit) || queryLimit < 1) {
+            queryLimit = 5; // значение по умолчанию
+        } else if (queryLimit > maxLimit) {
+            queryLimit = maxLimit; // ограничиваем максимумом
+        }
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(page) - 1) * queryLimit,
+            limit: queryLimit,
         }
 
         const user = await User.findById(userId)
