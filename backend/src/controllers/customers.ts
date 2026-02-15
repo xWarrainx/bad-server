@@ -2,7 +2,8 @@ import { NextFunction, Request, Response } from 'express'
 import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
-import User, { IUser } from '../models/user'
+import User, { IUser, Role } from '../models/user'
+import ForbiddenError from '../errors/forbidden-error';
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -13,6 +14,10 @@ export const getCustomers = async (
     next: NextFunction
 ) => {
     try {
+        const {user} = res.locals;
+        if (!user || !user.roles.includes(Role.Admin)) {
+            return next(new ForbiddenError('Доступ запрещен. Требуются права администратора'));
+        }
         const {
             page = 1,
             limit = 10,
@@ -28,6 +33,22 @@ export const getCustomers = async (
             orderCountTo,
             search,
         } = req.query
+
+        // Устанавливаем максимальный лимит
+        const maxLimit = 10;
+        let queryLimit = Number(limit);
+
+        // Валидация лимита
+        if (isNaN(queryLimit) || queryLimit < 1) {
+            queryLimit = 10; // значение по умолчанию
+        } else if (queryLimit > maxLimit) {
+            queryLimit = maxLimit; // ограничиваем максимумом
+        }
+
+        let pageNum = Number(page);
+        if (isNaN(pageNum) || pageNum < 1) {
+            pageNum = 1;
+        }
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
@@ -116,8 +137,8 @@ export const getCustomers = async (
 
         const options = {
             sort,
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (pageNum - 1) * queryLimit,
+            limit: queryLimit,
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -137,15 +158,15 @@ export const getCustomers = async (
         ])
 
         const totalUsers = await User.countDocuments(filters)
-        const totalPages = Math.ceil(totalUsers / Number(limit))
+        const totalPages = Math.ceil(totalUsers / queryLimit)
 
         res.status(200).json({
             customers: users,
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: pageNum,
+                pageSize: queryLimit,
             },
         })
     } catch (error) {
