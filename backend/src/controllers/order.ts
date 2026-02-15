@@ -4,7 +4,7 @@ import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
-import User from '../models/user'
+import User, { Role } from '../models/user'
 import sanitizeHtml from 'sanitize-html';
 
 // eslint-disable-next-line max-len
@@ -16,6 +16,10 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        const user = res.locals.user;
+        if (!user.roles.includes(Role.Admin)) {
+            return next(new ForbiddenError('Доступ запрещен. Требуются права администратора'));
+        }
         const {
             page = 1,
             limit = 10,
