@@ -4,21 +4,30 @@ import path from 'path'
 
 export default function serveStatic(baseDir: string) {
     return (req: Request, res: Response, next: NextFunction) => {
-        // Определяем полный путь к запрашиваемому файлу
-        const filePath = path.join(baseDir, req.path)
+        try {
+            const normalizedPath = path.normalize(req.path).replace(/^(\.\.[\/\\])+/, '');
 
-        // Проверяем, существует ли файл
-        fs.access(filePath, fs.constants.F_OK, (err) => {
-            if (err) {
-                // Файл не существует отдаем дальше мидлварам
-                return next()
+            const filePath = path.join(baseDir, normalizedPath);
+
+            // Проверяем, что итоговый путь всё еще внутри baseDir
+            if (!filePath.startsWith(baseDir)) {
+                console.warn(`Path traversal attempt blocked: ${req.path}`);
+                return next();
             }
-            // Файл существует, отправляем его клиенту
-            return res.sendFile(filePath, (err) => {
+
+            fs.access(filePath, fs.constants.F_OK, (err) => {
                 if (err) {
-                    next(err)
+                    return next();
                 }
-            })
-        })
-    }
+
+                return res.sendFile(filePath, (err) => {
+                    if (err) {
+                        next(err);
+                    }
+                });
+            });
+        } catch (error) {
+            next();
+        }
+    };
 }
