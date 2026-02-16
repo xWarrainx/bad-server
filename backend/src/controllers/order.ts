@@ -1,10 +1,12 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery, Error as MongooseError, Types } from 'mongoose'
+import sanitizeHtml from 'sanitize-html';
 import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
+import ForbiddenError from '../errors/forbidden-error'
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
-import User from '../models/user'
+import User, { Role } from '../models/user'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -15,6 +17,10 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        const {user} = res.locals;
+        if (!user.roles.includes(Role.Admin)) {
+            return next(new ForbiddenError('Доступ запрещен. Требуются права администратора'));
+        }
         const {
             page = 1,
             limit = 10,
@@ -28,14 +34,25 @@ export const getOrders = async (
             search,
         } = req.query
 
+        // Устанавливаем максимальный лимит в 10
+        const maxLimit = 10;
+        let queryLimit = Number(limit);
+
+        // Проверяем, что limit - число и не превышает максимум
+        if (Number.isNaN(queryLimit) || queryLimit < 1) {
+            queryLimit = 10; // значение по умолчанию
+        } else if (queryLimit > maxLimit) {
+            queryLimit = maxLimit; // ограничиваем максимумом
+        }
+
         const filters: FilterQuery<Partial<IOrder>> = {}
 
         if (status) {
-            if (typeof status === 'object') {
-                Object.assign(filters, status)
-            }
             if (typeof status === 'string') {
                 filters.status = status
+            }
+            else if (typeof status === 'object') {
+                return next(new BadRequestError('Некорректный формат параметра status'));
             }
         }
 
@@ -116,8 +133,8 @@ export const getOrders = async (
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (Number(page) - 1) * queryLimit },
+            { $limit: queryLimit },
             {
                 $group: {
                     _id: '$_id',
@@ -133,7 +150,7 @@ export const getOrders = async (
 
         const orders = await Order.aggregate(aggregatePipeline)
         const totalOrders = await Order.countDocuments(filters)
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / queryLimit)
 
         res.status(200).json({
             orders,
@@ -141,7 +158,7 @@ export const getOrders = async (
                 totalOrders,
                 totalPages,
                 currentPage: Number(page),
-                pageSize: Number(limit),
+                pageSize: queryLimit,
             },
         })
     } catch (error) {
@@ -157,9 +174,18 @@ export const getOrdersCurrentUser = async (
     try {
         const userId = res.locals.user._id
         const { search, page = 1, limit = 5 } = req.query
+        // Устанавливаем максимальный лимит для пользователя
+        const maxLimit = 10;
+        let queryLimit = Number(limit);
+
+        if (Number.isNaN(queryLimit) || queryLimit < 1) {
+            queryLimit = 5; // значение по умолчанию
+        } else if (queryLimit > maxLimit) {
+            queryLimit = maxLimit; // ограничиваем максимумом
+        }
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(page) - 1) * queryLimit,
+            limit: queryLimit,
         }
 
         const user = await User.findById(userId)
@@ -309,13 +335,20 @@ export const createOrder = async (
             return next(new BadRequestError('Неверная сумма заказа'))
         }
 
+        // Санитизируем комментарий - удаляем все HTML теги
+        const sanitizedComment = sanitizeHtml(comment, {
+            allowedTags: [], // Не разрешаем никакие теги
+            allowedAttributes: {}, // Не разрешаем атрибуты
+            disallowedTagsMode: 'discard' // Удаляем теги, не экранируем
+        });
+
         const newOrder = new Order({
             totalAmount: total,
             products: items,
             payment,
             phone,
             email,
-            comment,
+            comment: sanitizedComment,
             customer: userId,
             deliveryAddress: address,
         })

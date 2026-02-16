@@ -9,15 +9,17 @@ import {
     updateCurrentUser,
 } from '../controllers/auth'
 import auth from '../middlewares/auth'
+import { validateAuthentication, validateUserBody } from '../middlewares/validations'
+import { authLimiter } from '../middlewares/rateLimiter'
 
 const authRouter = Router()
 
 authRouter.get('/user', auth, getCurrentUser)
 authRouter.patch('/me', auth, updateCurrentUser)
 authRouter.get('/user/roles', auth, getCurrentUserRoles)
-authRouter.post('/login', login)
+authRouter.post('/login', authLimiter, validateAuthentication, login)
 authRouter.get('/token', refreshAccessToken)
 authRouter.get('/logout', logout)
-authRouter.post('/register', register)
+authRouter.post('/register', authLimiter, validateUserBody, register)
 
 export default authRouter
