@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import fs from 'fs/promises'
-import BadRequestError from '../errors/bad-request-error'
 import { fileTypeFromFile } from 'file-type'
+import BadRequestError from '../errors/bad-request-error'
 
 const minFileSize = 2 * 1024; // 2KB
 const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/svg+xml', 'image/webp'];

@@ -39,14 +39,14 @@ export const getCustomers = async (
         let queryLimit = Number(limit);
 
         // Валидация лимита
-        if (isNaN(queryLimit) || queryLimit < 1) {
+        if (Number.isNaN(queryLimit) || queryLimit < 1) {
             queryLimit = 10; // значение по умолчанию
         } else if (queryLimit > maxLimit) {
             queryLimit = maxLimit; // ограничиваем максимумом
         }
 
         let pageNum = Number(page);
-        if (isNaN(pageNum) || pageNum < 1) {
+        if (Number.isNaN(pageNum) || pageNum < 1) {
             pageNum = 1;
         }
 

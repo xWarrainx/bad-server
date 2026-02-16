@@ -39,7 +39,7 @@ export const getOrders = async (
         let queryLimit = Number(limit);
 
         // Проверяем, что limit - число и не превышает максимум
-        if (isNaN(queryLimit) || queryLimit < 1) {
+        if (Number.isNaN(queryLimit) || queryLimit < 1) {
             queryLimit = 10; // значение по умолчанию
         } else if (queryLimit > maxLimit) {
             queryLimit = maxLimit; // ограничиваем максимумом
@@ -178,7 +178,7 @@ export const getOrdersCurrentUser = async (
         const maxLimit = 10;
         let queryLimit = Number(limit);
 
-        if (isNaN(queryLimit) || queryLimit < 1) {
+        if (Number.isNaN(queryLimit) || queryLimit < 1) {
             queryLimit = 5; // значение по умолчанию
         } else if (queryLimit > maxLimit) {
             queryLimit = maxLimit; // ограничиваем максимумом
