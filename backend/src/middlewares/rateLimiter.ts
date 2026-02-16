@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 // Общий лимитер для всех запросов
 export const globalLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 минута
-    max: 10, // максимум 10 запросов с одного IP
+    max: 60, // максимум 60 запросов с одного IP
     message: {
         success: false,
         message: 'Слишком много запросов с вашего IP, попробуйте позже'
